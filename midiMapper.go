@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"github.com/rakyll/portmidi"
-	"time"
 )
 
 /*
@@ -84,6 +83,22 @@ func readFromIncomingDevices(streams []portmidi.Stream) {
 	}
 }
 
+func readFromDeviceWriteToDevice(OutStream portmidi.Stream, InStream portmidi.Stream, maxEvents int) {
+	for {
+		events, err := OutStream.Read(maxEvents)
+		if err != nil {
+			log.Fatal(err)
+		} else {
+			if len(events) > 0 {
+				InStream.Write(events)
+				for j := 0; j < len(events); j++ {
+					fmt.Println(events[j].Timestamp, events[j].Status, events[j].Data1, events[j].Data2)
+				}
+			}
+		}
+	}
+}
+
 func main(){
 	fmt.Printf("Reading from midi channels\n")
 	
@@ -105,16 +120,13 @@ func main(){
 	var defaultOutDeviceID = portmidi.DefaultOutputDeviceID() // returns the ID of the system default output
 	fmt.Printf("Default output device ID: %d\n\n", defaultOutDeviceID)
 
-	inStream, err := portmidi.NewInputStream(portmidi.DeviceID(1), 1024)
+	InStream, err := portmidi.NewInputStream(portmidi.DeviceID(1), 1024)
+	OutStream, err := portmidi.NewOutputStream(portmidi.DeviceID(6), 1024, 0)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	for {
-		readFromStreamForSamplesNEveryTimeT(*inStream, 10, 10, 10)
-		time.Sleep(time.Second)
-	}
-
+	readFromDeviceWriteToDevice(*InStream, *OutStream, 10)
 
 }
