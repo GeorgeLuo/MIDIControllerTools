@@ -13,6 +13,12 @@ import (
 	SDK functions:
 	ListenAll: output array of event -> instrument mappings
 	map device toggles to any device toggle
+
+	TODO: should close stream at end of session, otherwise 
+	switching instruments can lead to irregular behavior
+	TODO: read yaml config to initialize mapping
+	TODO: make loops async to switch channels outside of 
+	tunneling loop
 */
 
 var deviceLayout DeviceLayout
@@ -146,16 +152,16 @@ func isOffCommand(command int64) bool {
 }
 
 func onCommand(channel int) int64 {
-	return OnChannels[channel]
+	return OnChannels[channel-1]
 }
 
 func offCommand(channel int) int64 {
-	return OffChannels[channel]
+	return OffChannels[channel-1]
 }
 
 func readFromDeviceWriteToDevice(OutStream portmidi.Stream, InStream portmidi.Stream, maxEvents int, outChannel int) {
 	var status int64
-
+	fmt.Println(outChannel)
 	for {
 		events, err := OutStream.Read(maxEvents)
 		if err != nil {
@@ -207,6 +213,6 @@ func main(){
 		log.Fatal(err)
 	}
 
-	readFromDeviceWriteToDevice(*InStream, *OutStream, 10, 2)
+	readFromDeviceWriteToDevice(*InStream, *OutStream, 10, 3)
 
 }
