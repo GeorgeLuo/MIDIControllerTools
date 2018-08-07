@@ -6,6 +6,8 @@ import (
 	"github.com/rakyll/portmidi"
 )
 
+import "sync"
+
 /*
 	Design:
 	EnvironmentSession: map of devices
@@ -47,13 +49,25 @@ const (
 	channel1Off = 128
 	channel2Off = 129
 	channel3Off = 130
+
+	cutoffFilter = 102
 )
+
+type NoteMap struct {
+	inControlNote int64
+	outControlNote int64
+}
 
 type Device struct {
 	name string
 	input bool
 	output bool
 	open bool
+}
+
+type StreamWrapper struct {
+	ignoreStatus map[int64]bool
+	underStream portmidi.Stream
 }
 
 var OnChannels = [3]int64{channel1On, channel2On, channel3On}
@@ -64,6 +78,9 @@ var OffChannels = [3]int64{channel1Off, channel2Off, channel3Off}
 var OnToOffSet = make(map[int]int)
 var OnSet = make(map[int]bool)
 var OffSet = make(map[int]bool)
+
+var Filters = make(map[int64]bool)
+
 
 func initializeChannelConstants() {
 
@@ -78,6 +95,7 @@ func initializeChannelConstants() {
 	OffSet[channel1Off] = true
 	OffSet[channel2Off] = true
 	OffSet[channel3Off] = true
+	Filters[cutoffFilter] = true
 }
 
 func initializeDeviceLayout() {
@@ -116,22 +134,34 @@ func pollDevice(stream portmidi.Stream) {
 	}
 }
 
-func readFromStreamForSamplesNEveryTimeT(stream portmidi.Stream, numSamples int, duration int, maxEvents int) {
-	for i := 0; i < numSamples; i++ {
-		events, err := stream.Read(maxEvents)	
+func readFromIncomingDevices(streams []StreamWrapper, maxEvents int) {
+	fmt.Println(len(streams))
+	readFunctions := make([]func(), len(streams))
+	for i := 0; i < len(streams); i++ {
+		fmt.Println("loop", i)
+		var funcNum = i // need to initialize value otherwise Parallel uses the final value of i
+		readFunctions[funcNum] = func() {
+			fmt.Println("setting func", funcNum)
+		    readFromIncomingDevice(streams[funcNum], maxEvents)
+		}
+	}
+	fmt.Println(readFunctions)
+
+	Parallelize(readFunctions)
+}
+
+func readFromIncomingDevice(stream StreamWrapper, maxEvents int) {
+	for {
+		events, err := stream.underStream.Read(maxEvents)	
 		if err != nil {
 			log.Fatal(err)
 		} else {
 			for j := 0; j < len(events); j++ {
-				fmt.Println(events[j].Timestamp, events[j].Status, events[j].Data1, events[j].Data2)
+				if !stream.ignoreStatus[events[j].Status] {
+					fmt.Println(events[j].Timestamp, events[j].Status, events[j].Data1, events[j].Data2)
+				}
 			}
 		}
-	}
-}
-
-func readFromIncomingDevices(streams []portmidi.Stream) {
-	for i := 0; i < len(streams); i++ {
-
 	}
 }
 
@@ -159,7 +189,20 @@ func offCommand(channel int) int64 {
 	return OffChannels[channel-1]
 }
 
-func readFromDeviceWriteToDevice(OutStream portmidi.Stream, InStream portmidi.Stream, maxEvents int, outChannel int) {
+// TODO: account for note = 0
+func noteMapContains(noteMap map[int64]int64, check int64) bool {
+	if noteMap[check] == 0 {
+		return false
+	} else {
+		return true
+	}
+}
+
+func isFilter(note int64) bool {
+	return Filters[note]
+}
+
+func readFromDeviceWriteToDevice(OutStream portmidi.Stream, InStream portmidi.Stream, noteMap map[int64]int64, channelMap map[int64]int64, maxEvents int, outChannel int) {
 	var status int64
 	fmt.Println(outChannel)
 	for {
@@ -167,21 +210,51 @@ func readFromDeviceWriteToDevice(OutStream portmidi.Stream, InStream portmidi.St
 		if err != nil {
 			log.Fatal(err)
 		} else {
-			var sendEvents = make([]portmidi.Event, len(events))
+			var sendEvents = make([]portmidi.Event, 0)
 			if len(events) > 0 {
+				fmt.Println("num events", len(events))
 				for j := 0; j < len(events); j++ {
 					fmt.Println(events[j].Timestamp, events[j].Status, events[j].Data1, events[j].Data2)
-					if isOnCommand(events[j].Status) {
-						status = onCommand(outChannel)
-					} else if isOffCommand(events[j].Status) {
-						status = offCommand(outChannel)
+
+					if noteMapContains(noteMap, events[j].Data1) {
+						// rewrite note (knob or slide)
+						status = channelMap[events[j].Status]
+						note := noteMap[events[j].Data1]
+						sendEvents = append(sendEvents, portmidi.Event{Timestamp: events[j].Timestamp, Status: status, Data1: note, Data2: events[j].Data2})
+						fmt.Println("sending: ", events[j].Timestamp, status, note, events[j].Data2)
+						if isFilter(noteMap[events[j].Data1]) {
+							sendEvents = append(sendEvents, portmidi.Event{Timestamp: events[j].Timestamp, Status: status, Data1: note + int64(1), Data2: events[j].Data2})
+							fmt.Println("sending: ", events[j].Timestamp, status, note + int64(1), events[j].Data2)
+						}
+					} else {
+						if isOnCommand(events[j].Status) {
+							status = onCommand(outChannel)
+						} else if isOffCommand(events[j].Status) {
+							status = offCommand(outChannel)
+							}
+							sendEvents = append(sendEvents, portmidi.Event{Timestamp: events[j].Timestamp, Status: status, Data1: events[j].Data1, Data2: events[j].Data2})
+						}
 					}
-					sendEvents[j] = portmidi.Event{Timestamp: events[j].Timestamp, Status: status, Data1: events[j].Data1, Data2: events[j].Data2}
+					InStream.Write(sendEvents)
 				}
-				InStream.Write(sendEvents)
 			}
 		}
 	}
+
+func Parallelize(functions []func()) {
+    var waitGroup sync.WaitGroup
+    for i := 0; i < len(functions); i++ {
+    	waitGroup.Add(len(functions))
+    }
+
+    defer waitGroup.Wait()
+
+    for _, function := range functions {
+        go func(copy func()) {
+            defer waitGroup.Done()
+            copy()
+        }(function)
+    }
 }
 
 func main(){
@@ -206,13 +279,26 @@ func main(){
 	var defaultOutDeviceID = portmidi.DefaultOutputDeviceID() // returns the ID of the system default output
 	fmt.Printf("Default output device ID: %d\n\n", defaultOutDeviceID)
 
-	InStream, err := portmidi.NewInputStream(portmidi.DeviceID(1), 1024)
-	OutStream, err := portmidi.NewOutputStream(portmidi.DeviceID(6), 1024, 0)
+	InStreamOrigin62, err := portmidi.NewInputStream(portmidi.DeviceID(1), 1024)
+
+	InStreamJDXI, err := portmidi.NewInputStream(portmidi.DeviceID(2), 1024)
+	var jdxiIgnoreMap = make(map[int64]bool)
+	jdxiIgnoreMap[248] = true
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	readFromDeviceWriteToDevice(*InStream, *OutStream, 10, 3)
+	var originToJDXINoteMap = make(map[int64]int64)
+	var originToJDXIChannelMap = make(map[int64]int64)
+
+	originToJDXINoteMap[70] = 102
+	originToJDXIChannelMap[176] = 177
+
+	OutStreamJDXI, err := portmidi.NewOutputStream(portmidi.DeviceID(6), 1024, 0)
+	readFromDeviceWriteToDevice(*InStreamOrigin62, *OutStreamJDXI, originToJDXINoteMap, originToJDXIChannelMap, 10, 2)
+
+	var inStreams = []StreamWrapper{StreamWrapper{underStream: *InStreamJDXI, ignoreStatus: jdxiIgnoreMap}, StreamWrapper{underStream: *InStreamOrigin62, ignoreStatus: make(map[int64]bool)}}
+	readFromIncomingDevices(inStreams, 10)
 
 }
