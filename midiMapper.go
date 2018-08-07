@@ -281,7 +281,11 @@ func main() {
 	var defaultOutDeviceID = portmidi.DefaultOutputDeviceID() // returns the ID of the system default output
 	fmt.Printf("Default output device ID: %d\n\n", defaultOutDeviceID)
 
+	InStreamAndroid, err := portmidi.NewInputStream(portmidi.DeviceID(3), 1024)
 	InStreamOrigin62, err := portmidi.NewInputStream(portmidi.DeviceID(1), 1024)
+	var androidIgnoreMap = make(map[int64]bool)
+	androidIgnoreMap[248] = true
+
 
 	InStreamJDXI, err := portmidi.NewInputStream(portmidi.DeviceID(2), 1024)
 	var jdxiIgnoreMap = make(map[int64]bool)
@@ -297,10 +301,20 @@ func main() {
 	originToJDXINoteMap[70] = 102
 	originToJDXIChannelMap[176] = 177
 
+	var androidToJDXIChannelMap = make(map[int64]int64)
+	androidToJDXIChannelMap[144] = 128
+
+
 	OutStreamJDXI, err := portmidi.NewOutputStream(portmidi.DeviceID(6), 1024, 0)
+
+	// readFromDeviceWriteToDevice(*InStreamAndroid, *OutStreamJDXI, make(map[int64]int64), androidToJDXIChannelMap, 10, 2)
+
 	readFromDeviceWriteToDevice(*InStreamOrigin62, *OutStreamJDXI, originToJDXINoteMap, originToJDXIChannelMap, 10, 2)
 
-	var inStreams = []StreamWrapper{StreamWrapper{underStream: *InStreamJDXI, ignoreStatus: jdxiIgnoreMap}, StreamWrapper{underStream: *InStreamOrigin62, ignoreStatus: make(map[int64]bool)}}
+
+	// var inStreams = []StreamWrapper{StreamWrapper{underStream: *InStreamAndroid, ignoreStatus: androidIgnoreMap}, StreamWrapper{underStream: *InStreamJDXI, ignoreStatus: jdxiIgnoreMap}, StreamWrapper{underStream: *InStreamOrigin62, ignoreStatus: make(map[int64]bool)}}
+	var inStreams = []StreamWrapper{StreamWrapper{underStream: *InStreamAndroid, ignoreStatus: androidIgnoreMap}, StreamWrapper{underStream: *InStreamJDXI, ignoreStatus: jdxiIgnoreMap}, StreamWrapper{underStream: *InStreamOrigin62, ignoreStatus: make(map[int64]bool)}}
+
 	readFromIncomingDevices(inStreams, 10)
 
 }
