@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"github.com/rakyll/portmidi"
+	"log"
 )
 
 import "sync"
@@ -16,10 +16,10 @@ import "sync"
 	ListenAll: output array of event -> instrument mappings
 	map device toggles to any device toggle
 
-	TODO: should close stream at end of session, otherwise 
+	TODO: should close stream at end of session, otherwise
 	switching instruments can lead to irregular behavior
 	TODO: read yaml config to initialize mapping
-	TODO: make loops async to switch channels outside of 
+	TODO: make loops async to switch channels outside of
 	tunneling loop
 */
 
@@ -31,16 +31,16 @@ type DeviceLayout struct {
 
 const (
 
-/*
-	declare constants for channel 1-3
-	10010000= 90= 144| Chan 1      Note on        |      "        |      "
-	10010001= 91= 145| Chan 2         "           |      "        |      "
-	10010010= 92= 146| Chan 3         "           |      "        |      "
+	/*
+		declare constants for channel 1-3
+		10010000= 90= 144| Chan 1      Note on        |      "        |      "
+		10010001= 91= 145| Chan 2         "           |      "        |      "
+		10010010= 92= 146| Chan 3         "           |      "        |      "
 
-	10000000= 80= 128| Chan 1      Note off       |  Note Number  | Note Velocity
-	10000001= 81= 129| Chan 2         "           |   (0-127)     |   (0-127)
-	10000010= 82= 130| Chan 3         "           |     see       |      "
-*/
+		10000000= 80= 128| Chan 1      Note off       |  Note Number  | Note Velocity
+		10000001= 81= 129| Chan 2         "           |   (0-127)     |   (0-127)
+		10000010= 82= 130| Chan 3         "           |     see       |      "
+	*/
 
 	channel1On = 144
 	channel2On = 145
@@ -54,20 +54,20 @@ const (
 )
 
 type NoteMap struct {
-	inControlNote int64
+	inControlNote  int64
 	outControlNote int64
 }
 
 type Device struct {
-	name string
-	input bool
+	name   string
+	input  bool
 	output bool
-	open bool
+	open   bool
 }
 
 type StreamWrapper struct {
 	ignoreStatus map[int64]bool
-	underStream portmidi.Stream
+	underStream  portmidi.Stream
 }
 
 var OnChannels = [3]int64{channel1On, channel2On, channel3On}
@@ -80,7 +80,6 @@ var OnSet = make(map[int]bool)
 var OffSet = make(map[int]bool)
 
 var Filters = make(map[int64]bool)
-
 
 func initializeChannelConstants() {
 
@@ -104,7 +103,7 @@ func initializeDeviceLayout() {
 	deviceList := make([]Device, numDevices)
 	for i := 0; i < numDevices; i++ {
 		var portInfo = portmidi.Info(portmidi.DeviceID(i))
-		fmt.Printf("Port %d:\nName: %s\nInput Available: %t\nOutput Available: %t\nIs Open: %t\n\n", i, portInfo.Name, 
+		fmt.Printf("Port %d:\nName: %s\nInput Available: %t\nOutput Available: %t\nIs Open: %t\n\n", i, portInfo.Name,
 			portInfo.IsInputAvailable, portInfo.IsOutputAvailable, portInfo.IsOpened)
 
 		deviceList[i] = Device{name: portInfo.Name, input: portInfo.IsInputAvailable, output: portInfo.IsOutputAvailable, open: portInfo.IsOpened}
@@ -115,13 +114,13 @@ func initializeDeviceLayout() {
 
 type KnobToKnobMapping struct {
 	FromDevice int64
-	ToDevice int64
-	FromKnob int64
-	ToKnob int64
+	ToDevice   int64
+	FromKnob   int64
+	ToKnob     int64
 }
 
 func pollDevice(stream portmidi.Stream) {
-	
+
 	result, err := stream.Poll()
 	if err != nil {
 		log.Fatal(err)
@@ -142,7 +141,7 @@ func readFromIncomingDevices(streams []StreamWrapper, maxEvents int) {
 		var funcNum = i // need to initialize value otherwise Parallel uses the final value of i
 		readFunctions[funcNum] = func() {
 			fmt.Println("setting func", funcNum)
-		    readFromIncomingDevice(streams[funcNum], maxEvents)
+			readFromIncomingDevice(streams[funcNum], maxEvents)
 		}
 	}
 	fmt.Println(readFunctions)
@@ -152,7 +151,7 @@ func readFromIncomingDevices(streams []StreamWrapper, maxEvents int) {
 
 func readFromIncomingDevice(stream StreamWrapper, maxEvents int) {
 	for {
-		events, err := stream.underStream.Read(maxEvents)	
+		events, err := stream.underStream.Read(maxEvents)
 		if err != nil {
 			log.Fatal(err)
 		} else {
@@ -202,6 +201,9 @@ func isFilter(note int64) bool {
 	return Filters[note]
 }
 
+/*
+	TODO: change streams to channels, will reduce number of parameters by determining readable channel to MIDI channel.
+*/
 func readFromDeviceWriteToDevice(OutStream portmidi.Stream, InStream portmidi.Stream, noteMap map[int64]int64, channelMap map[int64]int64, maxEvents int, outChannel int) {
 	var status int64
 	fmt.Println(outChannel)
@@ -224,42 +226,42 @@ func readFromDeviceWriteToDevice(OutStream portmidi.Stream, InStream portmidi.St
 						fmt.Println("sending: ", events[j].Timestamp, status, note, events[j].Data2)
 						if isFilter(noteMap[events[j].Data1]) {
 							sendEvents = append(sendEvents, portmidi.Event{Timestamp: events[j].Timestamp, Status: status, Data1: note + int64(1), Data2: events[j].Data2})
-							fmt.Println("sending: ", events[j].Timestamp, status, note + int64(1), events[j].Data2)
+							fmt.Println("sending: ", events[j].Timestamp, status, note+int64(1), events[j].Data2)
 						}
 					} else {
 						if isOnCommand(events[j].Status) {
 							status = onCommand(outChannel)
 						} else if isOffCommand(events[j].Status) {
 							status = offCommand(outChannel)
-							}
-							sendEvents = append(sendEvents, portmidi.Event{Timestamp: events[j].Timestamp, Status: status, Data1: events[j].Data1, Data2: events[j].Data2})
 						}
+						sendEvents = append(sendEvents, portmidi.Event{Timestamp: events[j].Timestamp, Status: status, Data1: events[j].Data1, Data2: events[j].Data2})
 					}
-					InStream.Write(sendEvents)
 				}
+				InStream.Write(sendEvents)
 			}
 		}
 	}
-
-func Parallelize(functions []func()) {
-    var waitGroup sync.WaitGroup
-    for i := 0; i < len(functions); i++ {
-    	waitGroup.Add(len(functions))
-    }
-
-    defer waitGroup.Wait()
-
-    for _, function := range functions {
-        go func(copy func()) {
-            defer waitGroup.Done()
-            copy()
-        }(function)
-    }
 }
 
-func main(){
+func Parallelize(functions []func()) {
+	var waitGroup sync.WaitGroup
+	for i := 0; i < len(functions); i++ {
+		waitGroup.Add(len(functions))
+	}
+
+	defer waitGroup.Wait()
+
+	for _, function := range functions {
+		go func(copy func()) {
+			defer waitGroup.Done()
+			copy()
+		}(function)
+	}
+}
+
+func main() {
 	fmt.Printf("Reading from midi channels\n")
-	
+
 	portmidi.Initialize()
 	initializeChannelConstants()
 
@@ -269,7 +271,7 @@ func main(){
 
 	for i := 0; i < numDevices; i++ {
 		var portInfo = portmidi.Info(portmidi.DeviceID(i))
-		fmt.Printf("Port %d:\nName: %s\nInput Available: %t\nOutput Available: %t\nIs Open: %t\n\n", i, portInfo.Name, 
+		fmt.Printf("Port %d:\nName: %s\nInput Available: %t\nOutput Available: %t\nIs Open: %t\n\n", i, portInfo.Name,
 			portInfo.IsInputAvailable, portInfo.IsOutputAvailable, portInfo.IsOpened)
 	}
 
