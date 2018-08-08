@@ -70,6 +70,7 @@ type Device struct {
 type StreamWrapper struct {
 	ignoreStatus map[int64]bool
 	underStream  portmidi.Stream
+	portNum int
 }
 
 var OnChannels = [3]int64{channel1On, channel2On, channel3On}
@@ -169,7 +170,7 @@ func getAllInputStreams() []StreamWrapper {
 			fmt.Println(tempDevice.name, "stream", tempDevice.port, portmidi.DeviceID(tempDevice.port))
 			tempStream, _ := portmidi.NewInputStream(portmidi.DeviceID(tempDevice.port), 1024)
 			fmt.Println(tempStream)
-			inputStreams = append(inputStreams, StreamWrapper{underStream: *tempStream, ignoreStatus: make(map[int64]bool)})
+			inputStreams = append(inputStreams, StreamWrapper{underStream: *tempStream, portNum: tempDevice.port, ignoreStatus: make(map[int64]bool)})
 		}
 	}
 
@@ -179,7 +180,7 @@ func getAllInputStreams() []StreamWrapper {
 var jobQueue = NewJobQueue()
 
 type queueJob struct {
-	events []portmidi.Event
+	data jobInterface
 	next *queueJob
 }
 
@@ -202,11 +203,11 @@ func (q *JobQueue) Len() int {
 	return q.count
 }
 
-func (q *JobQueue) Push(event []portmidi.Event) {
+func (q *JobQueue) Push(event jobInterface) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
-	n := &queueJob{events: event}
+	n := &queueJob{data: event}
 
 	if q.tail == nil {
 		q.tail = n
@@ -218,7 +219,7 @@ func (q *JobQueue) Push(event []portmidi.Event) {
 	q.count++
 }
 
-func (q *JobQueue) Poll() []portmidi.Event {
+func (q *JobQueue) Poll() jobInterface {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
@@ -234,10 +235,10 @@ func (q *JobQueue) Poll() []portmidi.Event {
 	}
 	q.count--
 
-	return n.events
+	return n.data
 }
 
-func (q *JobQueue) Peek() []portmidi.Event {
+func (q *JobQueue) Peek() jobInterface {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
@@ -246,13 +247,26 @@ func (q *JobQueue) Peek() []portmidi.Event {
 		return nil
 	}
 
-	return n.events
+	return n.data
 }
+
+
+// func Rule struct {
+// 	// when mode
+// 	mode int
+// 	S
+// 	action func()
+// }
 
 func executeDispatchJobs() {
 	for {
 		if jobQueue.Len() > 0 {
-			fmt.Println("processing job", jobQueue.Poll())
+			midiEvents := jobQueue.Poll()
+			fmt.Println("processing events", midiEvents.commandSource(), midiEvents.events())
+			// port mode
+			if globalMode == 0 {
+
+			}
 		}
 	}
 }
@@ -275,15 +289,36 @@ func startParallelize(maxEvents int) {
 }
 
 /* change mode between
-	0 = play mode
-	1 = map control mode
+	0 = play mode using mapping
+	1 = map control mode, set by combination of midi events (maybe push two control buttons)
 */
+var globalMode = 0
 func changeMode(mode int) {
 	// var modeOn = true
 	// for modeOn {
 
 	// 	modeOn
 	// }
+	globalMode = mode
+}
+
+type jobInterface interface {
+	// use this value to check for rules mapping
+    commandSource() int
+    events() []portmidi.Event
+}
+
+type deviceJob struct {
+	source int
+	inputEvents []portmidi.Event
+}
+
+func (j deviceJob) commandSource() int {
+    return j.source
+}
+
+func (j deviceJob) events() []portmidi.Event {
+    return j.inputEvents
 }
 
 func readFromIncomingDevice(stream StreamWrapper, maxEvents int) {
@@ -295,7 +330,9 @@ func readFromIncomingDevice(stream StreamWrapper, maxEvents int) {
 			for j := 0; j < len(events); j++ {
 				if !stream.ignoreStatus[events[j].Status] {
 					// fmt.Println(events[j].Timestamp, events[j].Status, events[j].Data1, events[j].Data2)
-					jobQueue.Push(events)
+					toQueue := deviceJob{source: stream.portNum, inputEvents: events}
+					// next = jobInterface{commandSource: j, events: events}
+					jobQueue.Push(toQueue)
 				}
 			}
 		}
