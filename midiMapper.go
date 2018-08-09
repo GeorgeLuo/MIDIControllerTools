@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/rakyll/portmidi"
 	"log"
+	"github.com/GeorgeLuo/MIDIControllerTools/structures"
 	// "github.com/spf13/viper"
 )
 
@@ -106,7 +107,6 @@ func importDeviceConfig() {
 
 func initializeDeviceLayout() {
 	fmt.Println("initializing device layout")
-	portmidi.Initialize()
 	var numDevices = portmidi.CountDevices()
 	deviceList := make([]Device, numDevices)
 	for i := 0; i < numDevices; i++ {
@@ -179,77 +179,6 @@ func getAllInputStreams() []StreamWrapper {
 
 var jobQueue = NewJobQueue()
 
-type queueJob struct {
-	data jobInterface
-	next *queueJob
-}
-
-type JobQueue struct {
-	head  *queueJob
-	tail  *queueJob
-	count int
-	lock  *sync.Mutex
-}
-
-func NewJobQueue() *JobQueue {
-	q := &JobQueue{}
-	q.lock = &sync.Mutex{}
-	return q
-}
-
-func (q *JobQueue) Len() int {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-	return q.count
-}
-
-func (q *JobQueue) Push(event jobInterface) {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-
-	n := &queueJob{data: event}
-
-	if q.tail == nil {
-		q.tail = n
-		q.head = n
-	} else {
-		q.tail.next = n
-		q.tail = n
-	}
-	q.count++
-}
-
-func (q *JobQueue) Poll() jobInterface {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-
-	if q.head == nil {
-		return nil
-	}
-
-	n := q.head
-	q.head = n.next
-
-	if q.head == nil {
-		q.tail = nil
-	}
-	q.count--
-
-	return n.data
-}
-
-func (q *JobQueue) Peek() jobInterface {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-
-	n := q.head
-	if n == nil {
-		return nil
-	}
-
-	return n.data
-}
-
 
 // func Rule struct {
 // 	// when mode
@@ -259,13 +188,14 @@ func (q *JobQueue) Peek() jobInterface {
 // }
 
 func executeDispatchJobs() {
+	OutStreamJDXI, _ := portmidi.NewOutputStream(portmidi.DeviceID(6), 1024, 0)
+	// fmt.Println("processing events", midiEvents.commandSource(), midiEvents.events(), OutStreamJDXI)
+
 	for {
 		if jobQueue.Len() > 0 {
 			midiEvents := jobQueue.Poll()
-			fmt.Println("processing events", midiEvents.commandSource(), midiEvents.events())
-			// port mode
 			if globalMode == 0 {
-
+				tunnelData (midiEvents.events(), *OutStreamJDXI, 2)
 			}
 		}
 	}
@@ -300,17 +230,6 @@ func changeMode(mode int) {
 	// 	modeOn
 	// }
 	globalMode = mode
-}
-
-type jobInterface interface {
-	// use this value to check for rules mapping
-    commandSource() int
-    events() []portmidi.Event
-}
-
-type deviceJob struct {
-	source int
-	inputEvents []portmidi.Event
 }
 
 func (j deviceJob) commandSource() int {
@@ -419,6 +338,16 @@ func readFromDeviceWriteToDevice(OutStream portmidi.Stream, InStream portmidi.St
 	}
 }
 
+func tunnelData (events []portmidi.Event, InStream portmidi.Stream, outChannel int) {
+	var sendEvents = make([]portmidi.Event, 0)
+	for j := 0; j < len(events); j++ {
+		// fmt.Println(events[j].Timestamp, events[j].Status, events[j].Data1, events[j].Data2)
+		sendEvents = append(sendEvents, portmidi.Event{Timestamp: events[j].Timestamp, Status: events[j].Status, Data1: events[j].Data1, Data2: events[j].Data2})
+	}
+	// fmt.Println(sendEvents, InStream)
+	InStream.Write(sendEvents)
+}
+
 func Parallelize(functions []func()) {
 	var waitGroup sync.WaitGroup
 	for i := 0; i < len(functions); i++ {
@@ -438,7 +367,6 @@ func Parallelize(functions []func()) {
 func main() {
 	// fmt.Printf("Reading from midi channels\n")
 
-	// portmidi.Initialize()
 	// initializeChannelConstants()
 
 	// var numDevices = portmidi.CountDevices() // returns the number of MIDI devices
@@ -473,6 +401,7 @@ func main() {
 	// originToJDXINoteMap[70] = 102
 	// originToJDXIChannelMap[176] = 177
 
+	portmidi.Initialize() // need to run here or else the streams are out of scope
 	startParallelize(10)
 
 	// OutStreamJDXI, err := portmidi.NewOutputStream(portmidi.DeviceID(6), 1024, 0)
