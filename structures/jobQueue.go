@@ -86,3 +86,11 @@ func (q *JobQueue) Peek() jobInterface {
 
 	return n.data
 }
+
+func (j deviceJob) commandSource() int {
+    return j.source
+}
+
+func (j deviceJob) events() []portmidi.Event {
+    return j.inputEvents
+}
