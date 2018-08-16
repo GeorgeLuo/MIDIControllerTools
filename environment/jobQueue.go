@@ -1,5 +1,9 @@
-package structures
+package environment
 
+import (
+	"github.com/rakyll/portmidi"
+	"sync"
+)
 /*
 	threadsafe queue structure that contains the jobs to be proccessed.
 	deviceJob is the underlying Node that contains an array of midi event with a source (port).
@@ -7,13 +11,18 @@ package structures
 
 type jobInterface interface {
 	// use this value to check for rules mapping
-    commandSource() int
+    commandDestination() int
     events() []portmidi.Event
 }
 
-type deviceJob struct {
-	source int
-	inputEvents []portmidi.Event
+// type deviceJob struct {
+// 	source int
+// 	inputEvents []portmidi.Event
+// }
+
+type DeviceJob struct {
+	destination int
+	outboundEvents []portmidi.Event
 }
 
 type queueJob struct {
@@ -87,10 +96,10 @@ func (q *JobQueue) Peek() jobInterface {
 	return n.data
 }
 
-func (j deviceJob) commandSource() int {
-    return j.source
+func (j DeviceJob) commandDestination() int {
+    return j.destination
 }
 
-func (j deviceJob) events() []portmidi.Event {
-    return j.inputEvents
+func (j DeviceJob) events() []portmidi.Event {
+    return j.outboundEvents
 }
