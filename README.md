@@ -4,8 +4,8 @@ A tool to tunnel MIDI instructions between devices. The primary application is u
 
 Testing implementation optimized for JD-XI as output device.
 
-TODO: initialize using config files.\n
-TODO: implement a mapping mode to change control mappings dynamically.\n
+TODO: initialize using config files.<br />
+TODO: implement a mapping mode to change control mappings dynamically.<br />
 TODO: port application to micro-controller.
 
 Reference for MIDI mapping standards:
