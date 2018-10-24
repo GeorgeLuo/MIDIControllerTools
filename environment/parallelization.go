@@ -64,7 +64,7 @@ func ReadFromIncomingDevices(maxEvents int) {
 
 // read from device, translate inbound events to outbound events, add outbound events to jobQueue
 func ReadFromIncomingDevice(stream StreamWrapper, maxEvents int) {
-	fmt.Println(stream.portNum, "sees", SourcePortToStreams)
+	fmt.Println(stream.portNum, stream.underStream, "sees", SourcePortToStreams)
 	var outboundPort int
 	for {
 		events, err := stream.underStream.Read(maxEvents)
@@ -95,7 +95,7 @@ func ReadFromIncomingDevice(stream StreamWrapper, maxEvents int) {
 					}
 
 					// if control is not mapped and the inbound port is not mapped to another port, don't do anything
-				}
+				} 
 			}
 			if len(outboundEvents) > 0 {
 				toQueue := DeviceJob{destination: outboundPort, outboundEvents: outboundEvents}
