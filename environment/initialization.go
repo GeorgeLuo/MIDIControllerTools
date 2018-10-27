@@ -3,6 +3,10 @@ package environment
 import (
 	"github.com/rakyll/portmidi"
 	"fmt"
+	"encoding/json"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 )
 
 var GlobalMode = 0
@@ -40,7 +44,7 @@ func InitializeDeviceLayout() {
 				portInfo.IsInputAvailable, portInfo.IsOutputAvailable, portInfo.IsOpened)
 
 			DestinationPortToStreams[i] = *tempStream
-			DestinationDeviceToPort[portInfo.Name] = i
+			DestinationDeviceToPorts[portInfo.Name] = i
 		}
 	}
 
@@ -48,9 +52,11 @@ func InitializeDeviceLayout() {
 	for sourceDevice, port := range SourceDeviceToPorts {
 		outputDevice, exists := DeviceToDeviceMap[sourceDevice]
 		if exists {
-			SourcePortToDestinationPortMap[port] = DestinationDeviceToPort[outputDevice]
+			SourcePortToDestinationPortMap[port] = DestinationDeviceToPorts[outputDevice]
 		}
 	}
+
+	fmt.Print(SourcePortToDestinationPortMap)
 
 
 	fmt.Println("SourcePortToStreams", SourcePortToStreams)
@@ -61,7 +67,39 @@ func InitializePortToPortMap() {
 	// SourcePortToDestinationPortMap[1] = 6
 }
 
-func ReadMappingConfig() {
+func ReadMappingConfig(mapping_config_file string) {
+
+	absPath, err := filepath.Abs(mapping_config_file)
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	jsonFile, err := os.Open(absPath)
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	defer jsonFile.Close()
+
+	byteValue, _ := ioutil.ReadAll(jsonFile)
+
+	var deviceToDeviceMapping DeviceToDeviceMapping
+
+	json.Unmarshal(byteValue, &deviceToDeviceMapping)
+
+	for i := 0; i < len(deviceToDeviceMapping.DToDeMap); i++ {
+		// given device name, get port from SourceDeviceToPorts and DestinationDeviceToPorts
+
+		sourcePort := SourceDeviceToPorts[deviceToDeviceMapping.DToDeMap[i].SourceDevice]
+		destPort := DestinationDeviceToPorts[deviceToDeviceMapping.DToDeMap[i].DestinationDevice]
+
+		PortNoteChannelMap[PortNoteChannel{port: sourcePort, note: deviceToDeviceMapping.DToDeMap[i].SourceNote, channel: deviceToDeviceMapping.DToDeMap[i].SourceChannel}] = 
+		PortNoteChannel{port: destPort, note: deviceToDeviceMapping.DToDeMap[i].DestinationNote, channel: deviceToDeviceMapping.DToDeMap[i].DestinationChannel}
+	}
+
+	fmt.Println(PortNoteChannelMap)
 
 }
 
@@ -74,8 +112,8 @@ func InitializePortNoteChannelMapping() {
 	PortNoteChannelMap[PortNoteChannel{port: 1, note: 72, channel: 176}] = PortNoteChannel{port: 7, note: 102, channel: 178}
 	PortNoteChannelMap[PortNoteChannel{port: 1, note: 73, channel: 176}] = PortNoteChannel{port: 7, note: 102, channel: 185}
 
-	PortNoteChannelMap[PortNoteChannel{port: 1, note: 74, channel: 176}] = PortNoteChannel{port: 7, note: 98, channel: 176}
-	PortNoteChannelMap[PortNoteChannel{port: 1, note: 75, channel: 176}] = PortNoteChannel{port: 7, note: 98, channel: 177}
-	PortNoteChannelMap[PortNoteChannel{port: 1, note: 76, channel: 176}] = PortNoteChannel{port: 7, note: 98, channel: 178}
-	PortNoteChannelMap[PortNoteChannel{port: 1, note: 77, channel: 176}] = PortNoteChannel{port: 7, note: 98, channel: 185}
+	PortNoteChannelMap[PortNoteChannel{port: 1, note: 74, channel: 176}] = PortNoteChannel{port: 7, note: 117, channel: 176}
+	PortNoteChannelMap[PortNoteChannel{port: 1, note: 75, channel: 176}] = PortNoteChannel{port: 7, note: 117, channel: 177}
+	PortNoteChannelMap[PortNoteChannel{port: 1, note: 76, channel: 176}] = PortNoteChannel{port: 7, note: 117, channel: 178}
+	PortNoteChannelMap[PortNoteChannel{port: 1, note: 77, channel: 176}] = PortNoteChannel{port: 7, note: 117, channel: 185}
 }

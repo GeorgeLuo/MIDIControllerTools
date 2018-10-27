@@ -26,3 +26,17 @@ type StreamWrapper struct {
 	underStream  portmidi.Stream
 	portNum int
 }
+
+
+type DeviceToDeviceMapping struct {
+	DToDeMap []DToD `json:"DeviceToDeviceMap"`
+}
+
+type DToD struct {
+	SourceDevice   string `json:"sourceDevice"`
+	SourceNote   int64 `json:"sourceNote"`
+	SourceChannel    int64    `json:"sourceChannel"`
+	DestinationDevice   string `json:"destinationDevice"`
+	DestinationNote   int64 `json:"destinationNote"`
+	DestinationChannel    int64    `json:"destinationChannel"`
+}

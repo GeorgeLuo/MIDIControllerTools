@@ -11,8 +11,11 @@ func main() {
 
 	environment.InitializeDeviceLayout()
 
+
 	environment.InitializePortToPortMap()
-	environment.InitializePortNoteChannelMapping()
+	// environment.InitializePortNoteChannelMapping()
+
+	environment.ReadMappingConfig("config/channel_1_master.json")
 
 	environment.StartParallelize(10)
 }

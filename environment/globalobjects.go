@@ -26,7 +26,7 @@ var SourceDeviceToPorts = map[string] int {
 
 }
 
-var DestinationDeviceToPort = map[string] int {
+var DestinationDeviceToPorts = map[string] int {
 
 }
 

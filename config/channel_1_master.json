@@ -1,0 +1,57 @@
+{
+	"DeviceToDeviceMap" :[{ "sourceDevice" : "Origin62",
+								"sourceNote" : 70,
+								"sourceChannel" : 176,
+								"destinationDevice" : "JD-Xi",
+								"destinationNote" : 102,
+								"destinationChannel" : 176 },
+
+								{"sourceDevice" : "Origin62",
+								"sourceNote" : 71,
+								"sourceChannel" : 176,
+								"destinationDevice" : "JD-Xi",
+								"destinationNote" : 102,
+								"destinationChannel" : 177 },
+
+								{ "sourceDevice" : "Origin62",
+								"sourceNote" : 72,
+								"sourceChannel" : 176,
+								"destinationDevice" : "JD-Xi",
+								"destinationNote" : 102,
+								"destinationChannel" : 178 },
+
+								{ "sourceDevice" : "Origin62",
+								"sourceNote" : 73,
+								"sourceChannel" : 176,
+								"destinationDevice" : "JD-Xi",
+								"destinationNote" : 102,
+								"destinationChannel" : 185 },
+
+								{ "sourceDevice" : "Origin62",
+								"sourceNote" : 74,
+								"sourceChannel" : 176,
+								"destinationDevice" : "JD-Xi",
+								"destinationNote" : 117,
+								"destinationChannel" : 176 },
+
+								{ "sourceDevice" : "Origin62",
+								"sourceNote" : 75,
+								"sourceChannel" : 176,
+								"destinationDevice" : "JD-Xi",
+								"destinationNote" : 117,
+								"destinationChannel" : 177 },
+
+								{ "sourceDevice" : "Origin62",
+								"sourceNote" : 76,
+								"sourceChannel" : 176,
+								"destinationDevice" : "JD-Xi",
+								"destinationNote" : 117,
+								"destinationChannel" : 178 },
+
+								{ "sourceDevice" : "Origin62",
+								"sourceNote" : 77,
+								"sourceChannel" : 176,
+								"destinationDevice" : "JD-Xi",
+								"destinationNote" : 117,
+								"destinationChannel" : 185 }]
+}
